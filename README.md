@@ -21,6 +21,7 @@ isolado e privado; o sistema é multiusuário e escalável.
 python -m venv venv
 venv\Scripts\activate
 pip install -r requirements.txt
+copy .env.example .env          # liga DEBUG=True para desenvolvimento local
 python manage.py migrate
 python manage.py import_xlsx --create-user   # opcional: importa a planilha e cria thiago/tj123
 python manage.py runserver

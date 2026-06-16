@@ -85,10 +85,13 @@
 
 {% endblock %}
 {% block scripts %}
+{{ bar_chart|json_script:"barData" }}
+{{ pie_chart|json_script:"pieData" }}
+{{ line_chart|json_script:"lineData" }}
 <script>
-  const bar = {{ bar_chart|safe }};
-  const pie = {{ pie_chart|safe }};
-  const line = {{ line_chart|safe }};
+  const bar = JSON.parse(document.getElementById('barData').textContent);
+  const pie = JSON.parse(document.getElementById('pieData').textContent);
+  const line = JSON.parse(document.getElementById('lineData').textContent);
 
   new Chart(document.getElementById('barChart'), {
     type: 'bar',

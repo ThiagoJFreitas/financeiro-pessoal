@@ -4,7 +4,6 @@ via the selectors module), which is what enforces account isolation.
 
 from __future__ import annotations
 
-import json
 from datetime import date, datetime
 
 from django.contrib import messages
@@ -12,6 +11,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
 
 from . import selectors
 from .forms import CardForm, CategoryForm, InstallmentForm, TransactionForm
@@ -46,6 +46,16 @@ def _default_month(owner) -> date:
     this_month = date.today().replace(day=1)
     not_future = [m for m in months if m <= this_month]
     return not_future[0] if not_future else months[-1]
+
+
+def _safe_next(request, *candidates, fallback="transaction_list"):
+    """Redirect target that only allows same-site URLs (prevents open redirect)."""
+    for cand in candidates:
+        if cand and url_has_allowed_host_and_scheme(
+            cand, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        ):
+            return cand
+    return fallback
 
 
 # --------------------------------------------------------------------------- #
@@ -83,9 +93,9 @@ def dashboard(request):
         "summary": summary,
         "cards": cards,
         "pending_review": Transaction.objects.filter(owner=owner, needs_review=True).count(),
-        "bar_chart": json.dumps(selectors.income_expense_series(owner, recent)),
-        "pie_chart": json.dumps(selectors.expense_by_category(owner, month)),
-        "line_chart": json.dumps(selectors.leftover_series(owner, recent)),
+        "bar_chart": selectors.income_expense_series(owner, recent),
+        "pie_chart": selectors.expense_by_category(owner, month),
+        "line_chart": selectors.leftover_series(owner, recent),
     }
     return render(request, "finance/dashboard.html", context)
 
@@ -144,7 +154,7 @@ def transaction_toggle_review(request, pk):
     if request.method == "POST":
         tx.needs_review = not tx.needs_review
         tx.save(update_fields=["needs_review"])
-    return redirect(request.META.get("HTTP_REFERER") or "transaction_list")
+    return redirect(_safe_next(request, request.META.get("HTTP_REFERER")))
 
 
 @login_required
@@ -153,7 +163,7 @@ def transactions_mark_all_reviewed(request):
     if request.method == "POST":
         n = Transaction.objects.filter(owner=request.user, needs_review=True).update(needs_review=False)
         messages.success(request, f"{n} lançamentos marcados como revisados.")
-    return redirect(request.META.get("HTTP_REFERER") or "transaction_list")
+    return redirect(_safe_next(request, request.META.get("HTTP_REFERER")))
 
 
 @login_required
@@ -202,7 +212,7 @@ def installment_edit(request, pk):
     if request.method == "POST" and form.is_valid():
         form.save()
         messages.success(request, "Parcela atualizada.")
-        return redirect(request.GET.get("next") or "transaction_list")
+        return redirect(_safe_next(request, request.GET.get("next")))
     return render(request, "finance/installment_form.html", {"form": form, "installment": inst})
 
 
@@ -213,7 +223,7 @@ def installment_toggle_paid(request, pk):
         inst.paid = not inst.paid
         inst.paid_date = date.today() if inst.paid else None
         inst.save(update_fields=["paid", "paid_date"])
-    return redirect(request.META.get("HTTP_REFERER") or "transaction_list")
+    return redirect(_safe_next(request, request.META.get("HTTP_REFERER")))
 
 
 # --------------------------------------------------------------------------- #
@@ -349,6 +359,6 @@ def report_to_pay(request):
         "categories": Category.objects.filter(owner=owner, kind=Kind.EXPENSE),
         "filters": {"month": request.GET.get("month", ""), "card": card_id or "",
                     "category": category_id or "", "status": request.GET.get("status", "unpaid")},
-        "card_chart": json.dumps({"labels": list(by_card.keys()), "data": list(by_card.values())}),
+        "card_chart": {"labels": list(by_card.keys()), "data": list(by_card.values())},
     }
     return render(request, "finance/report_to_pay.html", context)

@@ -73,8 +73,9 @@
 </div>
 {% endblock %}
 {% block scripts %}
+{{ card_chart|json_script:"cardData" }}
 <script>
-  const cc = {{ card_chart|safe }};
+  const cc = JSON.parse(document.getElementById('cardData').textContent);
   if (cc.labels.length) {
     new Chart(document.getElementById('cardChart'), {
       type: 'bar',

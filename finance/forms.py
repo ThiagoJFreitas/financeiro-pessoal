@@ -3,6 +3,8 @@ user, so you can never accidentally attach your transaction to someone else's
 card. ``owner`` is set in the view, never trusted from the form.
 """
 
+import re
+
 from django import forms
 
 from .models import Card, Category, Installment, Transaction
@@ -74,12 +76,23 @@ class CardForm(BootstrapMixin, forms.ModelForm):
         labels = {"name": "Nome", "closing_day": "Dia do fechamento", "due_day": "Dia do vencimento", "limit": "Limite"}
 
 
+HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+
+
 class CategoryForm(BootstrapMixin, forms.ModelForm):
     class Meta:
         model = Category
         fields = ["name", "kind", "color"]
         labels = {"name": "Nome", "kind": "Tipo", "color": "Cor"}
         widgets = {"color": forms.TextInput(attrs={"type": "color"})}
+
+    def clean_color(self):
+        # Only allow a #rrggbb hex value (the color picker already produces this);
+        # blocks anything that could be injected into an inline style attribute.
+        color = self.cleaned_data["color"]
+        if not HEX_COLOR_RE.match(color):
+            raise forms.ValidationError("Use uma cor no formato #RRGGBB.")
+        return color
 
 
 class InstallmentForm(BootstrapMixin, forms.ModelForm):

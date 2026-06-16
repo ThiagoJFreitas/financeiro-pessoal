@@ -28,7 +28,9 @@ SECRET_KEY = os.getenv(
     "django-insecure-_&*9x5gvks8di@4ki@c$^@x&y-86yj^$91#7i=658uw%88m@$-",
 )
 
-DEBUG = env_bool("DEBUG", True)
+# Default to False for safety: a deploy that forgets to set DEBUG stays locked
+# down. Local development opts back in via .env (DEBUG=True).
+DEBUG = env_bool("DEBUG", False)
 
 # Comma-separated list, e.g. "meuapp.onrender.com,localhost"
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
@@ -82,12 +84,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 
 # Database: SQLite by default; DATABASE_URL (Postgres) overrides in the cloud.
-DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-    )
-}
+# Treat an empty DATABASE_URL the same as unset (falls back to SQLite).
+DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600)}
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -127,3 +126,9 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", True)
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    # HTTP Strict Transport Security: force HTTPS for a year (incl. subdomains).
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    X_FRAME_OPTIONS = "DENY"
