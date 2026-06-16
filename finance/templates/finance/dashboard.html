@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load money %}
+{% block title %}Resumo{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap mb-3">
+  <h3 class="mb-0">Resumo do mês</h3>
+  <form method="get" class="d-flex align-items-center gap-2">
+    <label class="text-muted small mb-0">Mês:</label>
+    <input type="month" name="month" value="{{ month|date:'Y-m' }}" class="form-control form-control-sm" onchange="this.form.submit()">
+  </form>
+</div>
+
+{% if pending_review %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center">
+  <div><i class="bi bi-exclamation-triangle"></i>
+    Você tem <strong>{{ pending_review }}</strong> lançamentos importados <strong>pendentes de revisão</strong>. Confira os valores e confirme.</div>
+  <a href="{% url 'transaction_list' %}?review=pending" class="btn btn-sm btn-warning">Revisar agora</a>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card kpi text-white bg-success h-100"><div class="card-body">
+      <div class="text-uppercase small">Receitas</div>
+      <div class="value">{{ summary.income|brl }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card kpi text-white bg-danger h-100"><div class="card-body">
+      <div class="text-uppercase small">Despesas</div>
+      <div class="value">{{ summary.expense|brl }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-4">
+    <div class="card kpi text-white {% if summary.leftover < 0 %}bg-dark{% else %}bg-primary{% endif %} h-100"><div class="card-body">
+      <div class="text-uppercase small">Sobra</div>
+      <div class="value">{{ summary.leftover|brl }}</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100"><div class="card-body">
+      <h6 class="card-title">Receitas x Despesas (últimos meses)</h6>
+      <canvas id="barChart" height="140"></canvas>
+    </div></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100"><div class="card-body">
+      <h6 class="card-title">Despesas por categoria ({{ month|date:'m/Y' }})</h6>
+      <canvas id="pieChart" height="140"></canvas>
+    </div></div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-lg-7">
+    <div class="card shadow-sm"><div class="card-body">
+      <h6 class="card-title">Sobra ao longo dos meses</h6>
+      <canvas id="lineChart" height="120"></canvas>
+    </div></div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm"><div class="card-body">
+      <h6 class="card-title">Faturas de cartão deste mês</h6>
+      {% if cards %}
+      <table class="table table-sm mb-0">
+        <thead><tr><th>Cartão</th><th class="text-end">Fatura</th><th class="text-center">Venc.</th></tr></thead>
+        <tbody>
+        {% for c in cards %}
+          <tr>
+            <td><a href="{% url 'card_detail' c.card.pk %}">{{ c.card.name }}</a></td>
+            <td class="text-end">{{ c.total|brl }}</td>
+            <td class="text-center">{% if c.due_day %}dia {{ c.due_day }}{% else %}-{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="text-muted mb-0">Nenhuma fatura de cartão neste mês.</p>{% endif %}
+    </div></div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+  const bar = {{ bar_chart|safe }};
+  const pie = {{ pie_chart|safe }};
+  const line = {{ line_chart|safe }};
+
+  new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: { labels: bar.labels, datasets: [
+      { label: 'Receitas', data: bar.income, backgroundColor: '#198754' },
+      { label: 'Despesas', data: bar.expense, backgroundColor: '#dc3545' },
+    ]},
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+  });
+
+  if (pie.labels.length) {
+    new Chart(document.getElementById('pieChart'), {
+      type: 'doughnut',
+      data: { labels: pie.labels, datasets: [{ data: pie.data, backgroundColor: pie.colors }] },
+      options: { responsive: true, plugins: { legend: { position: 'right' } } }
+    });
+  }
+
+  new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: { labels: line.labels, datasets: [
+      { label: 'Sobra', data: line.data, borderColor: '#0d6efd', tension: .3, fill: false }
+    ]},
+    options: { responsive: true }
+  });
+</script>
+{% endblock %}

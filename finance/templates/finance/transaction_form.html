@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-8">
+    <div class="card shadow-sm"><div class="card-body p-4">
+      <h4 class="mb-3">{{ title }}</h4>
+      <form method="post">{% csrf_token %}
+        <div class="row g-3">
+          {% for field in form %}
+            <div class="{% if field.name == 'description' or field.name == 'notes' %}col-12{% else %}col-md-6{% endif %}">
+              <label class="form-label">{{ field.label }}</label>
+              {{ field }}
+              {% if field.help_text %}<div class="form-text">{{ field.help_text|safe }}</div>{% endif %}
+              {% for error in field.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+        <div class="alert alert-info small mt-3 mb-3">
+          <strong>Dica:</strong> "Parcelado" divide o valor total nas N parcelas (meses seguidos).
+          "Fixo/Recorrente" repete o valor cheio por N meses (aluguel, salário). "Único" = um lançamento só.
+        </div>
+        <button class="btn btn-success">Salvar</button>
+        <a href="{% url 'transaction_list' %}" class="btn btn-link">Cancelar</a>
+      </form>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

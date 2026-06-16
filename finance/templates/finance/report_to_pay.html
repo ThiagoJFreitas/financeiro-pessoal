@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load money %}
+{% block title %}A Pagar{% endblock %}
+{% block content %}
+<h3 class="mb-3">Relatório — A Pagar</h3>
+
+<form method="get" class="card card-body shadow-sm mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3"><label class="form-label small">Mês</label>
+      <input type="month" name="month" value="{{ filters.month }}" class="form-control form-control-sm"></div>
+    <div class="col-md-3"><label class="form-label small">Cartão</label>
+      <select name="card" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        {% for c in cards %}<option value="{{ c.pk }}" {% if filters.card == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select></div>
+    <div class="col-md-3"><label class="form-label small">Categoria</label>
+      <select name="category" class="form-select form-select-sm">
+        <option value="">Todas</option>
+        {% for c in categories %}<option value="{{ c.pk }}" {% if filters.category == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select></div>
+    <div class="col-md-2"><label class="form-label small">Mostrar</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="unpaid" {% if filters.status == 'unpaid' %}selected{% endif %}>Só a pagar</option>
+        <option value="all" {% if filters.status == 'all' %}selected{% endif %}>Tudo</option>
+      </select></div>
+    <div class="col-md-1 d-grid"><button class="btn btn-primary btn-sm">Filtrar</button></div>
+  </div>
+</form>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-5">
+    <div class="card kpi bg-danger text-white"><div class="card-body">
+      <div class="text-uppercase small">Total a pagar (filtro atual)</div>
+      <div class="value">{{ total|brl }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-7">
+    <div class="card shadow-sm"><div class="card-body">
+      <h6 class="card-title">Distribuição por cartão</h6>
+      <canvas id="cardChart" height="90"></canvas>
+    </div></div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light"><tr><th>Competência</th><th>Vencimento</th><th>Descrição</th><th>Cartão</th><th>Categoria</th><th class="text-end">Valor</th><th class="text-center">Status</th></tr></thead>
+      <tbody>
+        {% for i in installments %}
+        <tr>
+          <td>{{ i.competence_month|date:'m/Y' }}</td>
+          <td>{% if i.due_date %}{{ i.due_date|date:'d/m/Y' }}{% else %}—{% endif %}</td>
+          <td>{{ i.label }}</td>
+          <td>{% if i.transaction.card %}{{ i.transaction.card.name }}{% else %}Boleto/Conta{% endif %}</td>
+          <td>{% if i.transaction.category %}{{ i.transaction.category.name }}{% else %}—{% endif %}</td>
+          <td class="text-end">{{ i.amount|brl }}</td>
+          <td class="text-center">
+            <form action="{% url 'installment_toggle_paid' i.pk %}" method="post" class="d-inline">{% csrf_token %}
+              <button class="btn btn-sm {% if i.paid %}btn-success{% else %}btn-outline-secondary{% endif %}">
+                {% if i.paid %}Pago{% else %}A pagar{% endif %}
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">Nada a pagar com esse filtro. 🎉</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light"><tr><th colspan="5">Total</th><th class="text-end">{{ total|brl }}</th><th></th></tr></tfoot>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const cc = {{ card_chart|safe }};
+  if (cc.labels.length) {
+    new Chart(document.getElementById('cardChart'), {
+      type: 'bar',
+      data: { labels: cc.labels, datasets: [{ label: 'A pagar', data: cc.data, backgroundColor: '#dc3545' }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } } }
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% load money %}
+{% block title %}Lançamentos{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">Lançamentos</h3>
+  <a href="{% url 'transaction_create' %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> Novo</a>
+</div>
+
+{% if pending_review %}
+<div class="alert alert-warning d-flex justify-content-between align-items-center py-2">
+  <div><i class="bi bi-exclamation-triangle"></i> <strong>{{ pending_review }}</strong> lançamentos pendentes de revisão (importados da planilha).</div>
+  <form action="{% url 'transactions_mark_all_reviewed' %}" method="post" onsubmit="return confirm('Marcar TODOS os pendentes como revisados?');">{% csrf_token %}
+    <button class="btn btn-sm btn-outline-dark">Marcar todos como revisados</button>
+  </form>
+</div>
+{% endif %}
+
+<form method="get" class="card card-body shadow-sm mb-3">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-2"><label class="form-label small">Mês</label>
+      <input type="month" name="month" value="{{ filters.month }}" class="form-control form-control-sm"></div>
+    <div class="col-md-2"><label class="form-label small">Tipo</label>
+      <select name="kind" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        <option value="EXPENSE" {% if filters.kind == 'EXPENSE' %}selected{% endif %}>Despesa</option>
+        <option value="INCOME" {% if filters.kind == 'INCOME' %}selected{% endif %}>Receita</option>
+      </select></div>
+    <div class="col-md-2"><label class="form-label small">Cartão</label>
+      <select name="card" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        {% for c in cards %}<option value="{{ c.pk }}" {% if filters.card == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select></div>
+    <div class="col-md-2"><label class="form-label small">Categoria</label>
+      <select name="category" class="form-select form-select-sm">
+        <option value="">Todas</option>
+        {% for c in categories %}<option value="{{ c.pk }}" {% if filters.category == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+      </select></div>
+    <div class="col-md-1"><label class="form-label small">Status</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        <option value="unpaid" {% if filters.status == 'unpaid' %}selected{% endif %}>A pagar</option>
+        <option value="paid" {% if filters.status == 'paid' %}selected{% endif %}>Pago</option>
+      </select></div>
+    <div class="col-md-2"><label class="form-label small">Revisão</label>
+      <select name="review" class="form-select form-select-sm">
+        <option value="">Todos</option>
+        <option value="pending" {% if filters.review == 'pending' %}selected{% endif %}>Pendentes</option>
+      </select></div>
+    <div class="col-md-1 d-grid"><button class="btn btn-primary btn-sm">Filtrar</button></div>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Competência</th><th>Descrição</th><th>Categoria</th><th>Cartão</th>
+            <th class="text-end">Valor</th><th class="text-center">Status</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for i in installments %}
+        <tr class="{% if i.transaction.kind == 'INCOME' %}table-success{% endif %}">
+          <td>{{ i.competence_month|date:'m/Y' }}</td>
+          <td>{{ i.label }}{% if i.transaction.needs_review %} <span class="badge bg-warning text-dark" title="Importado da planilha — revise">revisar</span>{% endif %}</td>
+          <td>{% if i.transaction.category %}<span class="badge" style="background:{{ i.transaction.category.color }}">{{ i.transaction.category.name }}</span>{% else %}-{% endif %}</td>
+          <td>{% if i.transaction.card %}{{ i.transaction.card.name }}{% else %}<span class="text-muted">Boleto/Conta</span>{% endif %}</td>
+          <td class="text-end">{{ i.amount|brl }}</td>
+          <td class="text-center">
+            <form action="{% url 'installment_toggle_paid' i.pk %}" method="post" class="d-inline">{% csrf_token %}
+              <button class="btn btn-sm {% if i.paid %}btn-success{% else %}btn-outline-secondary{% endif %}" title="Marcar pago/não pago">
+                {% if i.paid %}<i class="bi bi-check-lg"></i> Pago{% else %}A pagar{% endif %}
+              </button>
+            </form>
+          </td>
+          <td class="text-end text-nowrap">
+            {% if i.transaction.needs_review %}
+            <form action="{% url 'transaction_toggle_review' i.transaction.pk %}" method="post" class="d-inline">{% csrf_token %}
+              <button class="btn btn-sm btn-outline-success" title="Marcar como revisado"><i class="bi bi-check2-circle"></i></button>
+            </form>
+            {% endif %}
+            <a href="{% url 'installment_edit' i.pk %}" class="btn btn-sm btn-outline-primary" title="Editar parcela"><i class="bi bi-pencil"></i></a>
+            <a href="{% url 'transaction_edit' i.transaction.pk %}" class="btn btn-sm btn-outline-secondary" title="Editar lançamento"><i class="bi bi-list"></i></a>
+            <a href="{% url 'transaction_delete' i.transaction.pk %}" class="btn btn-sm btn-outline-danger" title="Excluir lançamento"><i class="bi bi-trash"></i></a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">Nenhum lançamento encontrado.</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light">
+        <tr><th colspan="4">Total ({{ installments|length }} parcelas)</th><th class="text-end">{{ total|brl }}</th><th colspan="2"></th></tr>
+      </tfoot>
+    </table>
+  </div>
+</div>
+
+{% endblock %}

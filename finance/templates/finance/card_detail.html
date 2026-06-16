@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% load money %}
+{% block title %}Faturas {{ card.name }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0"><i class="bi bi-credit-card"></i> {{ card.name }}</h3>
+  <a href="{% url 'card_list' %}" class="btn btn-outline-secondary btn-sm">Voltar</a>
+</div>
+<p class="text-muted">Vencimento: {% if card.due_day %}dia {{ card.due_day }}{% else %}—{% endif %}</p>
+
+{% for g in grouped %}
+<div class="card shadow-sm mb-3">
+  <div class="card-header d-flex justify-content-between">
+    <strong>Fatura {{ g.month|date:'F/Y'|capfirst }}</strong>
+    <strong>{{ g.total|brl }}</strong>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead class="table-light"><tr><th>Descrição</th><th class="text-center">Parcela</th><th class="text-end">Valor</th><th class="text-center">Status</th></tr></thead>
+      <tbody>
+        {% for i in g.items %}
+        <tr>
+          <td>{{ i.transaction.description }}</td>
+          <td class="text-center">{% if i.of_total > 1 %}{{ i.number }}/{{ i.of_total }}{% else %}—{% endif %}</td>
+          <td class="text-end">{{ i.amount|brl }}</td>
+          <td class="text-center">
+            {% if i.paid %}<span class="badge bg-success">Pago</span>{% else %}<span class="badge bg-secondary">A pagar</span>{% endif %}
+            <a href="{% url 'installment_edit' i.pk %}" class="btn btn-sm btn-link p-0 ms-1">editar</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% empty %}
+<p class="text-muted">Este cartão ainda não tem lançamentos.</p>
+{% endfor %}
+{% endblock %}
