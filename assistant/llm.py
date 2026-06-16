@@ -14,7 +14,9 @@ from .schema import EXAMPLES, SCHEMA_PROMPT
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:7b")
-TIMEOUT = 120
+# Generous: local CPU inference of a 7B model is slow, and the very first call
+# also pays the model-load cost. Ollama keeps it warm for ~5 min afterwards.
+TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", "300"))
 
 
 class LLMUnavailable(RuntimeError):
