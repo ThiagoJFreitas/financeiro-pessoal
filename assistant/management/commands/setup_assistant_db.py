@@ -29,7 +29,7 @@ SELECT t.id, t.kind, t.description, t.total_amount, t.repeat_type,
 FROM finance_transaction t
 LEFT JOIN finance_card c ON c.id = t.card_id
 LEFT JOIN finance_category cat ON cat.id = t.category_id
-WHERE t.owner_id = current_setting('app.current_user_id', true)::int;
+WHERE t.owner_id = NULLIF(current_setting('app.current_user_id', true), '')::int;
 
 CREATE OR REPLACE VIEW analytics.v_installments AS
 SELECT i.id, i.competence_month, i.due_date, i.amount, i.paid, i.paid_date,
@@ -39,17 +39,17 @@ FROM finance_installment i
 JOIN finance_transaction t ON t.id = i.transaction_id
 LEFT JOIN finance_card c ON c.id = t.card_id
 LEFT JOIN finance_category cat ON cat.id = t.category_id
-WHERE i.owner_id = current_setting('app.current_user_id', true)::int;
+WHERE i.owner_id = NULLIF(current_setting('app.current_user_id', true), '')::int;
 
 CREATE OR REPLACE VIEW analytics.v_cards AS
 SELECT id, name, due_day, closing_day, "limit", owner_id
 FROM finance_card
-WHERE owner_id = current_setting('app.current_user_id', true)::int;
+WHERE owner_id = NULLIF(current_setting('app.current_user_id', true), '')::int;
 
 CREATE OR REPLACE VIEW analytics.v_categories AS
 SELECT id, name, kind, owner_id
 FROM finance_category
-WHERE owner_id = current_setting('app.current_user_id', true)::int;
+WHERE owner_id = NULLIF(current_setting('app.current_user_id', true), '')::int;
 
 DO $$
 BEGIN
