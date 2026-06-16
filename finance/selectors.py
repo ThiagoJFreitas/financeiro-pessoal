@@ -8,9 +8,9 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Count, Max, Sum
 
-from .models import Card, Installment, Kind
+from .models import Card, Installment, Kind, Transaction
 from .services import add_months, card_invoice_total, monthly_summary
 
 
@@ -96,3 +96,76 @@ def to_pay(owner, month: date | None = None, card_id=None, category_id=None, onl
 
 def queryset_total(qs) -> Decimal:
     return qs.aggregate(s=Sum("amount"))["s"] or Decimal("0")
+
+
+# --------------------------------------------------------------------------- #
+# Commitments / progress / burn-down
+# --------------------------------------------------------------------------- #
+
+def transaction_progress(tx) -> dict:
+    """Payment progress for one commitment (a Transaction and its parcelas)."""
+    insts = list(tx.installments.all())
+    total = sum((i.amount for i in insts), Decimal("0"))
+    paid = sum((i.amount for i in insts if i.paid), Decimal("0"))
+    unpaid = [i for i in insts if not i.paid]
+    next_installment = min(unpaid, key=lambda i: i.competence_month) if unpaid else None
+    return {
+        "total": total,
+        "paid": paid,
+        "remaining": total - paid,
+        "paid_count": sum(1 for i in insts if i.paid),
+        "total_count": len(insts),
+        "next_installment": next_installment,
+        "end_month": max((i.competence_month for i in insts), default=None),
+        "settled": not unpaid,
+    }
+
+
+def card_burndown(card) -> dict:
+    """Outstanding (unpaid) balance for a card across months — a burn-down.
+
+    outstanding(M) = sum of UNPAID installments with competence >= M, so it
+    steps down both as months pass and as parcelas get paid.
+    """
+    insts = list(Installment.objects.filter(owner=card.owner, transaction__card=card))
+    months = sorted({i.competence_month for i in insts})
+    unpaid = [i for i in insts if not i.paid]
+    labels, data = [], []
+    for m in months:
+        outstanding = sum((i.amount for i in unpaid if i.competence_month >= m), Decimal("0"))
+        labels.append(m.strftime("%m/%Y"))
+        data.append(float(outstanding))
+    return {"labels": labels, "data": data}
+
+
+def to_pay_grouped(owner, by: str = "card", month=None, card_id=None, category_id=None) -> list[dict]:
+    """Unpaid expenses grouped by card or category, with total + 'when it ends'."""
+    qs = to_pay(owner, month=month, card_id=card_id, category_id=category_id, only_unpaid=True)
+    key = "transaction__category__name" if by == "category" else "transaction__card__name"
+    fallback = "Sem categoria" if by == "category" else "Sem cartão / Boleto"
+    rows = (
+        qs.values(key)
+        .annotate(total=Sum("amount"), ends=Max("competence_month"), qtd=Count("id"))
+        .order_by("-total")
+    )
+    return [{"name": r[key] or fallback, "total": r["total"], "ends": r["ends"], "qtd": r["qtd"]} for r in rows]
+
+
+def active_commitments(owner) -> list[dict]:
+    """Multi-installment commitments (parcelados/recorrentes) not yet settled.
+
+    Drives the home list that shows '1/6' and links to the detail page.
+    """
+    txs = (
+        Transaction.objects.filter(owner=owner, repeat_count__gt=1, installments__paid=False)
+        .distinct()
+        .select_related("card", "category")
+    )
+    result = []
+    for tx in txs:
+        prog = transaction_progress(tx)
+        if prog["settled"]:
+            continue
+        result.append({"tx": tx, **prog})
+    result.sort(key=lambda r: r["next_installment"].competence_month if r["next_installment"] else date.max)
+    return result

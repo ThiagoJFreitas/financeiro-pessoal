@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% load money %}
+{% block title %}{{ tx.description }}{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">{{ tx.description }}</h3>
+  <a href="{% url 'transaction_list' %}" class="btn btn-outline-secondary btn-sm">Voltar</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3"><div class="card kpi bg-light h-100"><div class="card-body">
+    <div class="text-muted small text-uppercase">Total</div><div class="value">{{ progress.total|brl }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi bg-success text-white h-100"><div class="card-body">
+    <div class="small text-uppercase">Pago</div><div class="value">{{ progress.paid|brl }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi bg-danger text-white h-100"><div class="card-body">
+    <div class="small text-uppercase">Restante</div><div class="value">{{ progress.remaining|brl }}</div></div></div></div>
+  <div class="col-md-3"><div class="card kpi bg-primary text-white h-100"><div class="card-body">
+    <div class="small text-uppercase">Progresso</div><div class="value">{{ progress.paid_count }}/{{ progress.total_count }}</div>
+    {% if progress.end_month %}<div class="small">acaba em {{ progress.end_month|date:'m/Y' }}</div>{% endif %}</div></div></div></div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Parcelas</span>
+        <span>
+          <form action="{% url 'transaction_settle' tx.pk %}" method="post" class="d-inline"
+                onsubmit="return confirm('Quitar todas as parcelas restantes?');">{% csrf_token %}
+            <button class="btn btn-sm btn-success" {% if progress.settled %}disabled{% endif %}>Quitar tudo</button>
+          </form>
+          <a href="{% url 'transaction_edit' tx.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
+          <a href="{% url 'transaction_delete' tx.pk %}" class="btn btn-sm btn-outline-danger">Excluir</a>
+        </span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>#</th><th>Competência</th><th>Vencimento</th><th class="text-end">Valor</th><th class="text-center">Status</th><th></th></tr></thead>
+          <tbody>
+            {% for i in installments %}
+            <tr class="{% if i.paid %}table-success{% endif %}">
+              <td>{% if i.of_total > 1 %}{{ i.number }}/{{ i.of_total }}{% else %}—{% endif %}</td>
+              <td>{{ i.competence_month|date:'m/Y' }}</td>
+              <td>{% if i.due_date %}{{ i.due_date|date:'d/m/Y' }}{% else %}—{% endif %}</td>
+              <td class="text-end">{{ i.amount|brl }}</td>
+              <td class="text-center">{% if i.paid %}<span class="badge bg-success">Pago</span>{% else %}<span class="badge bg-secondary">A pagar</span>{% endif %}</td>
+              <td class="text-end">
+                <form action="{% url 'installment_toggle_paid' i.pk %}" method="post" class="d-inline">{% csrf_token %}
+                  {% if i.paid %}
+                    <button class="btn btn-sm btn-outline-secondary">Desfazer</button>
+                  {% else %}
+                    <button class="btn btn-sm btn-outline-success" title="Marcar como paga (antecipar)">Antecipar/Pagar</button>
+                  {% endif %}
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-5">
+    <div class="card shadow-sm"><div class="card-body">
+      <h6 class="card-title">Saldo restante ao longo dos meses</h6>
+      <canvas id="burndown" height="160"></canvas>
+    </div></div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+{{ burndown|json_script:"burndownData" }}
+<script>
+  const bd = JSON.parse(document.getElementById('burndownData').textContent);
+  new Chart(document.getElementById('burndown'), {
+    type: 'line',
+    data: { labels: bd.labels, datasets: [{ label: 'Saldo a pagar', data: bd.data, borderColor: '#dc3545', backgroundColor: 'rgba(220,53,69,.1)', fill: true, tension: .2, stepped: true }] },
+    options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  });
+</script>
+{% endblock %}

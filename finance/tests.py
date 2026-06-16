@@ -74,3 +74,50 @@ class IsolationTests(TestCase):
             generate_installments(tx)
         summary = monthly_summary(a, date(2026, 1, 1))
         self.assertEqual(summary.expense, Decimal("100.00"))  # b's 999 not included
+
+
+class CommitmentTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("c1", password="x")
+        self.tx = Transaction.objects.create(
+            owner=self.user, kind=Kind.EXPENSE, description="Geladeira",
+            total_amount=Decimal("300.00"), repeat_type=RepeatType.INSTALLMENT,
+            repeat_count=3, first_competence=date(2026, 1, 1),
+        )
+        generate_installments(self.tx)
+
+    def test_progress_counts_paid(self):
+        from finance.selectors import transaction_progress
+        first = self.tx.installments.order_by("number").first()
+        first.paid = True
+        first.save()
+        p = transaction_progress(self.tx)
+        self.assertEqual(p["paid_count"], 1)
+        self.assertEqual(p["total_count"], 3)
+        self.assertEqual(p["remaining"], Decimal("200.00"))
+        self.assertEqual(p["end_month"], date(2026, 3, 1))
+        self.assertFalse(p["settled"])
+
+    def test_settle_marks_all_paid(self):
+        from finance.selectors import transaction_progress
+        self.tx.installments.filter(paid=False).update(paid=True)
+        self.assertTrue(transaction_progress(self.tx)["settled"])
+
+    def test_burndown_decreases(self):
+        from finance.selectors import card_burndown
+        card = Card.objects.create(owner=self.user, name="X")
+        self.tx.card = card
+        self.tx.save()
+        bd = card_burndown(card)
+        # 3 unpaid months: 300 -> 200 -> 100 (stepping down)
+        self.assertEqual(bd["data"], [300.0, 200.0, 100.0])
+
+    def test_to_pay_grouped_by_card(self):
+        from finance.selectors import to_pay_grouped
+        card = Card.objects.create(owner=self.user, name="NUBANK")
+        self.tx.card = card
+        self.tx.save()
+        groups = to_pay_grouped(self.user, by="card")
+        self.assertEqual(groups[0]["name"], "NUBANK")
+        self.assertEqual(groups[0]["total"], Decimal("300.00"))
+        self.assertEqual(groups[0]["ends"], date(2026, 3, 1))

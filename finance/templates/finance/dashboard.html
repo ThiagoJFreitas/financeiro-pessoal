@@ -55,6 +55,29 @@
   </div>
 </div>
 
+{% if commitments %}
+<div class="card shadow-sm mt-3">
+  <div class="card-header">Parcelamentos e compromissos ativos</div>
+  <div class="table-responsive">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light"><tr><th>Descrição</th><th>Cartão</th><th class="text-center">Progresso</th><th class="text-center">Próxima</th><th class="text-center">Acaba em</th><th class="text-end">Restante</th></tr></thead>
+      <tbody>
+        {% for c in commitments %}
+        <tr style="cursor:pointer" onclick="window.location='{% url 'transaction_detail' c.tx.pk %}'">
+          <td>{{ c.tx.description }}</td>
+          <td>{% if c.tx.card %}{{ c.tx.card.name }}{% else %}<span class="text-muted">Avulso/Boleto</span>{% endif %}</td>
+          <td class="text-center"><span class="badge bg-primary">{{ c.paid_count }}/{{ c.total_count }}</span></td>
+          <td class="text-center">{% if c.next_installment %}{{ c.next_installment.competence_month|date:'m/Y' }}{% else %}—{% endif %}</td>
+          <td class="text-center">{% if c.end_month %}{{ c.end_month|date:'m/Y' }}{% endif %}</td>
+          <td class="text-end">{{ c.remaining|brl }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 <div class="row g-3 mt-1">
   <div class="col-lg-7">
     <div class="card shadow-sm"><div class="card-body">

@@ -15,7 +15,23 @@ isolado e privado; o sistema é multiusuário e escalável.
 - **Categorias** personalizáveis.
 - **Login/cadastro** por usuário — dados de um usuário nunca aparecem para outro.
 
-## Rodar localmente (Windows)
+## Rodar com Docker (recomendado — inclui Postgres e o chatbot)
+
+Pré-requisito: Docker Desktop rodando.
+
+```powershell
+docker compose up --build         # sobe web (Django) + db (Postgres) + ollama
+docker compose exec ollama ollama pull qwen2.5-coder:7b   # baixa o modelo da IA (uma vez)
+```
+
+- App: http://localhost:8000 (login **thiago / tj123** — os dados são carregados do fixture no 1º boot).
+- O Postgres fica exposto em `localhost:5432` (`financeiro`/`financeiro`) para você plugar qualquer ferramenta de BI.
+- **Assistente** (`/assistente/`): pergunte em português; a IA roda local (Ollama), consulta só os seus dados em modo somente-leitura.
+- Rodar os testes no container: `docker compose exec web python manage.py test`.
+
+> Modelo pesado? Troque `OLLAMA_MODEL` no `docker-compose.yml` por `qwen2.5-coder:1.5b`.
+
+## Rodar localmente sem Docker (SQLite)
 
 ```powershell
 python -m venv venv

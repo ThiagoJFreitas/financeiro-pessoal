@@ -6,3 +6,5 @@ db.sqlite3
 staticfiles/
 .DS_Store
 .claude/settings.local.json
+# Dados financeiros reais — não versionar (usado só p/ seed local do Docker)
+finance/fixtures/initial_data.json

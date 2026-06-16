@@ -14,5 +14,6 @@ urlpatterns = [
     path("sair/", auth_views.LogoutView.as_view(), name="logout"),
     path("cadastro/", register, name="register"),
 
+    path("", include("assistant.urls")),
     path("", include("finance.urls")),
 ]

@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
     "finance",
+    "assistant",
 ]
 
 MIDDLEWARE = [

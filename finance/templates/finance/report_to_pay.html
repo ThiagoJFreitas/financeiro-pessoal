@@ -23,6 +23,11 @@
         <option value="unpaid" {% if filters.status == 'unpaid' %}selected{% endif %}>Só a pagar</option>
         <option value="all" {% if filters.status == 'all' %}selected{% endif %}>Tudo</option>
       </select></div>
+    <div class="col-md-2"><label class="form-label small">Totalizar por</label>
+      <select name="group_by" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="card" {% if group_by == 'card' %}selected{% endif %}>Cartão</option>
+        <option value="category" {% if group_by == 'category' %}selected{% endif %}>Categoria</option>
+      </select></div>
     <div class="col-md-1 d-grid"><button class="btn btn-primary btn-sm">Filtrar</button></div>
   </div>
 </form>
@@ -36,9 +41,27 @@
   </div>
   <div class="col-md-7">
     <div class="card shadow-sm"><div class="card-body">
-      <h6 class="card-title">Distribuição por cartão</h6>
-      <canvas id="cardChart" height="90"></canvas>
+      <h6 class="card-title">Distribuição por {% if group_by == 'category' %}categoria{% else %}cartão{% endif %}</h6>
+      <canvas id="groupChart" height="90"></canvas>
     </div></div>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-header">Totais por {% if group_by == 'category' %}categoria{% else %}cartão{% endif %}</div>
+  <div class="table-responsive">
+    <table class="table table-sm mb-0">
+      <thead class="table-light"><tr><th>{% if group_by == 'category' %}Categoria{% else %}Cartão{% endif %}</th><th class="text-center">Qtd</th><th class="text-center">Quando acaba</th><th class="text-end">Total a pagar</th></tr></thead>
+      <tbody>
+        {% for g in groups %}
+        <tr><td>{{ g.name }}</td><td class="text-center">{{ g.qtd }}</td>
+          <td class="text-center">{% if g.ends %}{{ g.ends|date:'m/Y' }}{% else %}—{% endif %}</td>
+          <td class="text-end">{{ g.total|brl }}</td></tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted py-3">Nada a pagar.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -73,11 +96,11 @@
 </div>
 {% endblock %}
 {% block scripts %}
-{{ card_chart|json_script:"cardData" }}
+{{ group_chart|json_script:"groupData" }}
 <script>
-  const cc = JSON.parse(document.getElementById('cardData').textContent);
+  const cc = JSON.parse(document.getElementById('groupData').textContent);
   if (cc.labels.length) {
-    new Chart(document.getElementById('cardChart'), {
+    new Chart(document.getElementById('groupChart'), {
       type: 'bar',
       data: { labels: cc.labels, datasets: [{ label: 'A pagar', data: cc.data, backgroundColor: '#dc3545' }] },
       options: { indexAxis: 'y', plugins: { legend: { display: false } } }

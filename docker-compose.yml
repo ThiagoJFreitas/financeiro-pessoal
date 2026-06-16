@@ -1,0 +1,46 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: financeiro
+      POSTGRES_USER: financeiro
+      POSTGRES_PASSWORD: financeiro
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U financeiro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"   # exposto para você inspecionar com qualquer cliente SQL/BI
+
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SECRET_KEY: dev-docker-key-nao-use-em-producao
+      DEBUG: "True"
+      ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DATABASE_URL: "postgres://financeiro:financeiro@db:5432/financeiro"
+      # Conexão somente-leitura usada SÓ pelo assistente (text-to-SQL).
+      ASSISTANT_DATABASE_URL: "postgres://assistant_ro:assistant_ro_pw@db:5432/financeiro"
+      OLLAMA_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "qwen2.5-coder:7b"
+    volumes:
+      - .:/app          # hot-reload do código em desenvolvimento
+    ports:
+      - "8000:8000"
+
+  ollama:
+    image: ollama/ollama
+    volumes:
+      - ollama_models:/root/.ollama
+    ports:
+      - "11434:11434"
+
+volumes:
+  pgdata:
+  ollama_models:

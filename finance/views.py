@@ -5,6 +5,7 @@ via the selectors module), which is what enforces account isolation.
 from __future__ import annotations
 
 from datetime import date, datetime
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth import login
@@ -93,6 +94,7 @@ def dashboard(request):
         "summary": summary,
         "cards": cards,
         "pending_review": Transaction.objects.filter(owner=owner, needs_review=True).count(),
+        "commitments": selectors.active_commitments(owner),
         "bar_chart": selectors.income_expense_series(owner, recent),
         "pie_chart": selectors.expense_by_category(owner, month),
         "line_chart": selectors.leftover_series(owner, recent),
@@ -206,6 +208,35 @@ def transaction_delete(request, pk):
 
 
 @login_required
+def transaction_detail(request, pk):
+    """Commitment detail: remaining months, progress and actions."""
+    owner = request.user
+    tx = get_object_or_404(Transaction, pk=pk, owner=owner)
+    installments = tx.installments.all()
+    progress = selectors.transaction_progress(tx)
+    # Mini burn-down: outstanding (unpaid) balance falling month by month.
+    unpaid = [i for i in installments if not i.paid]
+    months = [i.competence_month for i in installments]
+    burndown = {
+        "labels": [m.strftime("%m/%Y") for m in months],
+        "data": [float(sum((j.amount for j in unpaid if j.competence_month >= m), Decimal("0"))) for m in months],
+    }
+    return render(request, "finance/transaction_detail.html", {
+        "tx": tx, "installments": installments, "progress": progress, "burndown": burndown,
+    })
+
+
+@login_required
+def transaction_settle(request, pk):
+    """Quitar: mark every remaining (unpaid) parcela of this commitment as paid."""
+    tx = get_object_or_404(Transaction, pk=pk, owner=request.user)
+    if request.method == "POST":
+        n = tx.installments.filter(paid=False).update(paid=True, paid_date=date.today())
+        messages.success(request, f"{n} parcelas quitadas.")
+    return redirect("transaction_detail", pk=tx.pk)
+
+
+@login_required
 def installment_edit(request, pk):
     inst = get_object_or_404(Installment, pk=pk, owner=request.user)
     form = InstallmentForm(request.POST or None, instance=inst)
@@ -286,7 +317,15 @@ def card_detail(request, pk):
         {"month": m, "items": items, "total": sum(i.amount for i in items)}
         for m, items in sorted(months.items())
     ]
-    return render(request, "finance/card_detail.html", {"card": card, "grouped": grouped})
+    unpaid = [i for i in installments if not i.paid]
+    summary = {
+        "remaining": sum((i.amount for i in unpaid), Decimal("0")),
+        "ends": max((i.competence_month for i in unpaid), default=None),
+    }
+    return render(request, "finance/card_detail.html", {
+        "card": card, "grouped": grouped, "summary": summary,
+        "burndown": selectors.card_burndown(card),
+    })
 
 
 # --------------------------------------------------------------------------- #
@@ -345,11 +384,9 @@ def report_to_pay(request):
 
     qs = selectors.to_pay(owner, month=month, card_id=card_id, category_id=category_id, only_unpaid=only_unpaid)
 
-    # Totals grouped by card for the report's chart/summary.
-    by_card: dict[str, float] = {}
-    for inst in qs:
-        name = inst.transaction.card.name if inst.transaction.card else "Sem cartão / Boleto"
-        by_card[name] = by_card.get(name, 0.0) + float(inst.amount)
+    # Group totals by card or category (user toggles), with "when it ends".
+    group_by = request.GET.get("group_by") if request.GET.get("group_by") in ("card", "category") else "card"
+    groups = selectors.to_pay_grouped(owner, by=group_by, month=month, card_id=card_id, category_id=category_id)
 
     context = {
         "installments": qs,
@@ -357,8 +394,10 @@ def report_to_pay(request):
         "available_months": selectors.months_with_data(owner),
         "cards": Card.objects.filter(owner=owner),
         "categories": Category.objects.filter(owner=owner, kind=Kind.EXPENSE),
+        "group_by": group_by,
+        "groups": groups,
+        "group_chart": {"labels": [g["name"] for g in groups], "data": [float(g["total"]) for g in groups]},
         "filters": {"month": request.GET.get("month", ""), "card": card_id or "",
                     "category": category_id or "", "status": request.GET.get("status", "unpaid")},
-        "card_chart": {"labels": list(by_card.keys()), "data": list(by_card.values())},
     }
     return render(request, "finance/report_to_pay.html", context)

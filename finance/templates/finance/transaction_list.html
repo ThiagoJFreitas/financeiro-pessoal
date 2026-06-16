@@ -63,7 +63,7 @@
         {% for i in installments %}
         <tr class="{% if i.transaction.kind == 'INCOME' %}table-success{% endif %}">
           <td>{{ i.competence_month|date:'m/Y' }}</td>
-          <td>{{ i.label }}{% if i.transaction.needs_review %} <span class="badge bg-warning text-dark" title="Importado da planilha — revise">revisar</span>{% endif %}</td>
+          <td><a href="{% url 'transaction_detail' i.transaction.pk %}" class="text-decoration-none">{{ i.label }}</a>{% if i.transaction.needs_review %} <span class="badge bg-warning text-dark" title="Importado da planilha — revise">revisar</span>{% endif %}</td>
           <td>{% if i.transaction.category %}<span class="badge" style="background:{{ i.transaction.category.color }}">{{ i.transaction.category.name }}</span>{% else %}-{% endif %}</td>
           <td>{% if i.transaction.card %}{{ i.transaction.card.name }}{% else %}<span class="text-muted">Boleto/Conta</span>{% endif %}</td>
           <td class="text-end">{{ i.amount|brl }}</td>
