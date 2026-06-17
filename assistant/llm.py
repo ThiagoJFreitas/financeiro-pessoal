@@ -41,11 +41,19 @@ def _chat(messages, temperature=0.0) -> str:
     return r.json()["message"]["content"]
 
 
-def generate_sql(question: str) -> str:
+def generate_sql(question: str, prior_sql: str = None, error: str = None) -> str:
     examples = "\n".join(f"P: {q}\nSQL: {s}" for q, s in EXAMPLES)
+    user = question
+    if prior_sql and error:
+        # Self-correction: show the model what failed so it can fix the SQL.
+        user = (
+            f"{question}\n\nO SQL anterior NÃO funcionou:\n{prior_sql}\n\n"
+            f"Erro: {error}\n\nCorrija e gere um novo SELECT válido usando apenas "
+            "as views analytics.v_*."
+        )
     messages = [
         {"role": "system", "content": SCHEMA_PROMPT + "\n\nExemplos:\n" + examples},
-        {"role": "user", "content": question},
+        {"role": "user", "content": user},
     ]
     return _chat(messages)
 

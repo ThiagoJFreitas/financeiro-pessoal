@@ -27,29 +27,43 @@ def chat(request):
     return render(request, "assistant/chat.html", context)
 
 
+MAX_ATTEMPTS = 2  # first try + one self-correction
+
+
 def _answer(question: str, owner_id: int) -> dict:
-    try:
-        raw_sql = llm.generate_sql(question)
-    except llm.LLMUnavailable as e:
-        return {"error": str(e)}
+    prior_sql, last_error = None, None
 
-    try:
-        sql = validate(raw_sql)
-    except UnsafeSQL as e:
-        return {"error": f"Consulta gerada foi bloqueada por segurança: {e}", "raw_sql": raw_sql}
+    for _ in range(MAX_ATTEMPTS):
+        try:
+            raw_sql = llm.generate_sql(question, prior_sql=prior_sql, error=last_error)
+        except llm.LLMUnavailable as e:
+            return {"error": str(e)}
 
-    try:
-        columns, rows = run_readonly(sql, owner_id)
-    except AssistantDBError as e:
-        return {"error": f"Erro ao executar a consulta: {e}", "sql": sql}
+        try:
+            sql = validate(raw_sql)
+        except UnsafeSQL as e:
+            prior_sql, last_error = raw_sql, str(e)
+            continue  # show the model the error and let it retry
 
-    if not rows:
-        summary = "Nenhum resultado encontrado para essa pergunta."
-    else:
+        try:
+            columns, rows = run_readonly(sql, owner_id)
+        except AssistantDBError as e:
+            prior_sql, last_error = sql, str(e)
+            continue
+
+        if not rows:
+            return {"summary": "Nenhum resultado encontrado para essa pergunta."}
         # Natural-language answer; fall back to a plain rendering if the model
         # that writes the summary is unavailable, so the user always sees text.
         summary = llm.summarize(question, columns, rows) or _fallback_text(columns, rows)
-    return {"summary": summary}
+        return {"summary": summary}
+
+    # Both attempts failed — be honest and helpful instead of dumping SQL.
+    return {"error": (
+        "Não consegui montar uma consulta confiável para essa pergunta. "
+        "Tente reformular de forma mais direta — por exemplo, citando um período "
+        "('em 2026'), uma categoria ou um cartão."
+    )}
 
 
 def _fallback_text(columns, rows) -> str:

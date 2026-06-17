@@ -33,6 +33,12 @@ Regras:
 - Para "quanto gastei/recebi", some v_installments.amount filtrando kind.
 - Despesas usam kind='EXPENSE'; receitas kind='INCOME'.
 - "a pagar" = paid = false. Use date_part/EXTRACT para filtrar ano/mês.
+- "sobra"/"saldo" de um mês = receitas - despesas naquele mês de competência.
+  Agrupe por mês com date_trunc('month', competence_month) e use
+  SUM(CASE WHEN kind='INCOME' THEN amount ELSE -amount END) como saldo do mês.
+- Para médias por mês, calcule o saldo por mês numa subconsulta e tire AVG().
+- Use apenas as views analytics.v_*. Funções como date_trunc, EXTRACT,
+  CURRENT_DATE e AVG são permitidas.
 - Responda APENAS com o SQL, sem explicação e sem ```.
 """
 
@@ -46,4 +52,9 @@ EXAMPLES = [
     ("Total de despesas por categoria",
      "SELECT category_name, SUM(amount) AS total FROM analytics.v_installments "
      "WHERE kind='EXPENSE' GROUP BY category_name ORDER BY total DESC"),
+    ("Quanto sobra de dinheiro por mês em média?",
+     "SELECT AVG(saldo) AS media_sobra_mensal FROM ("
+     "SELECT date_trunc('month', competence_month) AS mes, "
+     "SUM(CASE WHEN kind='INCOME' THEN amount ELSE -amount END) AS saldo "
+     "FROM analytics.v_installments GROUP BY 1) t"),
 ]

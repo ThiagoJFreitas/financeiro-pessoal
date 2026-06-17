@@ -11,11 +11,20 @@ import re
 
 MAX_ROWS = 200
 
-# Anything that could mutate, escalate, or chain a second statement.
+# Writes / escalation / dangerous functions. (Not a full DML list: the read-only
+# role + read-only transaction already make writes impossible at the DB level;
+# this is belt-and-suspenders and avoids false positives on SQL keywords like
+# the FROM inside EXTRACT(... FROM ...).)
 FORBIDDEN = re.compile(
-    r"\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|"
-    r"copy|set|reset|do|call|merge|comment|vacuum|analyze|begin|commit|"
-    r"rollback|savepoint|pg_sleep|pg_read_file|lo_import|lo_export)\b",
+    r"\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|merge|"
+    r"copy|dblink|pg_sleep|pg_read_file|pg_ls_dir|lo_import|lo_export)\b",
+    re.IGNORECASE,
+)
+
+# Base / system tables the assistant must never touch (the views expose the data
+# it is allowed to see). The read-only role also blocks these at the DB level.
+FORBIDDEN_TABLES = re.compile(
+    r"\b(finance_\w+|auth_\w+|django_\w+|pg_\w+|information_schema)\b",
     re.IGNORECASE,
 )
 
@@ -45,12 +54,8 @@ def validate(sql: str) -> str:
         raise UnsafeSQL("Apenas consultas SELECT são permitidas.")
     if FORBIDDEN.search(sql):
         raise UnsafeSQL("A consulta contém uma operação não permitida.")
-    # Must only reference the analytics views.
-    tables = re.findall(r"\b(?:from|join)\s+([a-zA-Z0-9_\.\"]+)", sql, re.IGNORECASE)
-    for t in tables:
-        name = t.strip('"').lower()
-        if not name.startswith("analytics.v_"):
-            raise UnsafeSQL(f"Tabela não permitida: {t}. Use apenas as views analytics.v_*.")
+    if FORBIDDEN_TABLES.search(sql):
+        raise UnsafeSQL("A consulta referencia tabelas não permitidas. Use apenas as views analytics.v_*.")
     # Force a row cap if the model didn't add one.
     if not re.search(r"\blimit\b", sql, re.IGNORECASE):
         sql = f"{sql} LIMIT {MAX_ROWS}"
