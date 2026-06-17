@@ -40,6 +40,9 @@ CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.getenv("CSRF_TRUSTED_ORIGINS", "")
 
 
 INSTALLED_APPS = [
+    # finance first so its templates/registration/* override the copies that
+    # ship with django.contrib.admin (the password-reset pages).
+    "finance",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -47,7 +50,6 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.humanize",
-    "finance",
     "assistant",
 ]
 
@@ -120,6 +122,23 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "dashboard"
 LOGOUT_REDIRECT_URL = "login"
+
+# Email (used by the "forgot password" reset). Locally, the console backend
+# prints the reset link to the server logs so you can test without SMTP. In
+# production, set EMAIL_HOST/EMAIL_HOST_USER/EMAIL_HOST_PASSWORD (and the
+# backend switches to SMTP automatically).
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND") or (
+    "django.core.mail.backends.smtp.EmailBackend"
+    if os.getenv("EMAIL_HOST")
+    else "django.core.mail.backends.console.EmailBackend"
+)
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Financeiro Pessoal <no-reply@financeiro.local>")
+PASSWORD_RESET_TIMEOUT = 60 * 60 * 24  # link válido por 24h
 
 # Production hardening (enabled only when DEBUG is off).
 if not DEBUG:

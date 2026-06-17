@@ -6,6 +6,8 @@ card. ``owner`` is set in the view, never trusted from the form.
 import re
 
 from django import forms
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth.models import User
 
 from .models import Card, Category, Installment, Transaction
 
@@ -23,6 +25,29 @@ class BootstrapMixin:
                 widget.attrs.setdefault("class", "form-select")
             else:
                 widget.attrs.setdefault("class", "form-control")
+
+
+class RegisterForm(BootstrapMixin, UserCreationForm):
+    """Sign-up with a required e-mail so 'forgot password' can reach the user."""
+
+    email = forms.EmailField(required=True, label="E-mail")
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username", "email")
+
+    def clean_email(self):
+        email = self.cleaned_data["email"]
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("Já existe uma conta com este e-mail.")
+        return email
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data["email"]
+        if commit:
+            user.save()
+        return user
 
 
 class TransactionForm(BootstrapMixin, forms.ModelForm):

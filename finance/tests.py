@@ -2,7 +2,8 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.core import mail
+from django.test import TestCase, override_settings
 
 from .models import Card, Installment, Kind, RepeatType, Transaction
 from .services import add_months, generate_installments, monthly_summary, split_amount
@@ -74,6 +75,29 @@ class IsolationTests(TestCase):
             generate_installments(tx)
         summary = monthly_summary(a, date(2026, 1, 1))
         self.assertEqual(summary.expense, Decimal("100.00"))  # b's 999 not included
+
+
+class PasswordResetTests(TestCase):
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_reset_emails_a_link_for_known_address(self):
+        User.objects.create_user("ze", email="ze@example.com", password="x")
+        r = self.client.post("/senha/reset/", {"email": "ze@example.com"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("senha/reset/", mail.outbox[0].body)
+
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_reset_does_not_leak_unknown_address(self):
+        # Django still shows "done" but sends nothing, avoiding account enumeration.
+        r = self.client.post("/senha/reset/", {"email": "ninguem@example.com"})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_register_requires_email(self):
+        from finance.forms import RegisterForm
+        form = RegisterForm(data={"username": "novo", "password1": "Abx12345zzz", "password2": "Abx12345zzz"})
+        self.assertFalse(form.is_valid())
+        self.assertIn("email", form.errors)
 
 
 class BulkActionTests(TestCase):
