@@ -77,6 +77,22 @@ class IsolationTests(TestCase):
         self.assertEqual(summary.expense, Decimal("100.00"))  # b's 999 not included
 
 
+class AdminHardeningTests(TestCase):
+    def test_old_admin_url_is_gone(self):
+        self.assertEqual(self.client.get("/admin/").status_code, 404)
+
+    def test_admin_moved_to_chefao(self):
+        self.assertEqual(self.client.get("/chefao/login/").status_code, 200)
+
+    def test_admin_requires_2fa_verification(self):
+        from django.test import Client
+        boss = User.objects.create_superuser("boss", "boss@example.com", "x")
+        c = Client()
+        c.force_login(boss)  # authenticated, but NOT OTP-verified
+        r = c.get("/chefao/", follow=False)
+        self.assertNotEqual(r.status_code, 200)  # blocked until a 2FA token is verified
+
+
 class PasswordResetTests(TestCase):
     @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
     def test_reset_emails_a_link_for_known_address(self):

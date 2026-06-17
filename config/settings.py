@@ -6,6 +6,7 @@ locally (SQLite) and in the cloud (Postgres). See .env.example.
 """
 
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -51,6 +52,10 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
     "assistant",
+    # Admin hardening.
+    "axes",                          # login rate-limiting / lockout
+    "django_otp",                    # 2FA framework
+    "django_otp.plugins.otp_totp",   # TOTP (Google Authenticator etc.)
 ]
 
 MIDDLEWARE = [
@@ -61,9 +66,26 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django_otp.middleware.OTPMiddleware",   # must come after AuthenticationMiddleware
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "axes.middleware.AxesMiddleware",        # must be last
 ]
+
+# Authentication backends: Axes wraps the standard backend to count failures.
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",  # checks lockout, delegates auth below
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+# --- Login rate-limiting (django-axes) ---
+AXES_FAILURE_LIMIT = 5                 # tentativas erradas antes de travar
+AXES_COOLOFF_TIME = 0.5                # destrava sozinho após 30 min
+AXES_LOCKOUT_PARAMETERS = ["username"] # trava por usuário (não por IP)
+AXES_RESET_ON_SUCCESS = True           # zera o contador ao logar certo
+# Axes precisa do request no authenticate, o que quebra client.login() nos testes.
+if "test" in sys.argv:
+    AXES_ENABLED = False
 
 ROOT_URLCONF = "config.urls"
 
@@ -152,3 +174,8 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     X_FRAME_OPTIONS = "DENY"
+
+# Test-only: admin pages use {% static %}; the manifest storage needs
+# collectstatic, which doesn't run under tests — use the plain storage instead.
+if "test" in sys.argv:
+    STORAGES["staticfiles"]["BACKEND"] = "django.contrib.staticfiles.storage.StaticFilesStorage"

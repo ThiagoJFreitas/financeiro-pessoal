@@ -8,3 +8,7 @@ python-dotenv==1.2.1
 psycopg2-binary==2.9.10
 # HTTP client for the local Ollama text-to-SQL assistant.
 requests==2.32.3
+# Admin hardening: login rate-limiting (axes) and 2FA (otp + QR for enrollment).
+django-axes==6.5.2
+django-otp==1.7.0
+qrcode==8.2

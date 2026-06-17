@@ -47,6 +47,23 @@ Acesse http://127.0.0.1:8000 e entre com **thiago / tj123** (ou crie uma conta n
 
 > Para um superusuário do admin (`/admin`): `python manage.py createsuperuser`.
 
+## Admin e segurança
+
+O painel técnico do Django fica em **`/chefao`** (não em `/admin`). Está protegido por:
+
+- **2FA obrigatório** (django-otp): além de usuário/senha, exige um código de 6 dígitos
+  de um app autenticador (Google Authenticator/Authy). Para cadastrar/renovar o 2FA de
+  um usuário e ver o QR Code:
+  ```
+  docker compose exec web python manage.py setup_2fa --user thiago
+  ```
+- **Rate-limit de login** (django-axes): trava após 5 tentativas erradas (por usuário),
+  destrava sozinho em 30 min. Para destravar manualmente: `python manage.py axes_reset`.
+- **HTTPS/HSTS, cookies seguros** já ligados quando `DEBUG=False`.
+
+Trocar senha (dentro do `/chefao`): canto superior direito → "Alterar senha", ou
+em **Users → usuário → senha**.
+
 ## Estrutura
 
 | Camada | Arquivo | Papel |
