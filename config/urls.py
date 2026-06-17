@@ -5,7 +5,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path
 from django_otp.admin import OTPAdminSite
 
-from finance.views import register
+from finance.views import force_password_change, register
 
 # Require a verified 2FA token to access the admin (/chefao). Enroll a user with
 # `manage.py setup_2fa`.
@@ -19,6 +19,7 @@ urlpatterns = [
     path("entrar/", auth_views.LoginView.as_view(template_name="registration/login.html"), name="login"),
     path("sair/", auth_views.LogoutView.as_view(), name="logout"),
     path("cadastro/", register, name="register"),
+    path("trocar-senha/", force_password_change, name="force_password_change"),
 
     # Esqueci a senha (fluxo padrão do Django, por e-mail).
     path("senha/reset/", auth_views.PasswordResetView.as_view(

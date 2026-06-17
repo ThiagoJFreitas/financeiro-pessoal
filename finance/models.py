@@ -12,6 +12,17 @@ from django.conf import settings
 from django.db import models
 
 
+class Profile(models.Model):
+    """Per-user flags. ``must_change_password`` forces a password change on the
+    next access (used for seed accounts created with a temporary password)."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="profile")
+    must_change_password = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Profile<{self.user}>"
+
+
 class Kind(models.TextChoices):
     EXPENSE = "EXPENSE", "Despesa"
     INCOME = "INCOME", "Receita"

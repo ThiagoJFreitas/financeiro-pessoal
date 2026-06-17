@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.core import mail
 from django.test import TestCase, override_settings
 
-from .models import Card, Installment, Kind, RepeatType, Transaction
+from .models import Card, Installment, Kind, Profile, RepeatType, Transaction
 from .services import add_months, generate_installments, monthly_summary, split_amount
 
 
@@ -75,6 +75,35 @@ class IsolationTests(TestCase):
             generate_installments(tx)
         summary = monthly_summary(a, date(2026, 1, 1))
         self.assertEqual(summary.expense, Decimal("100.00"))  # b's 999 not included
+
+
+class ForcePasswordChangeTests(TestCase):
+    def setUp(self):
+        from django.test import Client
+        self.user = User.objects.create_user("seed", password="pass")
+        Profile.objects.create(user=self.user, must_change_password=True)
+        self.client = Client()
+        self.client.login(username="seed", password="pass")
+
+    def test_redirected_until_password_changed(self):
+        r = self.client.get("/")  # dashboard
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/trocar-senha/", r.url)
+
+    def test_change_clears_flag_and_unblocks(self):
+        r = self.client.post("/trocar-senha/", {
+            "new_password1": "Forte#2026xyz", "new_password2": "Forte#2026xyz",
+        })
+        self.assertEqual(r.status_code, 302)
+        self.assertFalse(Profile.objects.get(user=self.user).must_change_password)
+        self.assertEqual(self.client.get("/").status_code, 200)  # now allowed
+
+    def test_self_registered_user_is_not_forced(self):
+        from django.test import Client
+        User.objects.create_user("free", password="Abc12345xyz")
+        c = Client()
+        c.login(username="free", password="Abc12345xyz")
+        self.assertEqual(c.get("/").status_code, 200)
 
 
 class AdminHardeningTests(TestCase):

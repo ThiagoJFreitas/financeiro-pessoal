@@ -61,8 +61,9 @@ docker compose up --build
 docker compose exec ollama ollama pull qwen2.5-coder:7b
 ```
 
-- App: <http://localhost:8000> — login **`thiago` / `tj123`** (dados de exemplo são
-  carregados no 1º boot, **se** existir o fixture local).
+- App: <http://localhost:8000> — login **`user` / `pass`** (senha temporária:
+  o sistema **obriga a definir uma senha pessoal no primeiro acesso**). Dados de
+  exemplo são carregados no 1º boot **se** existir o fixture local.
 - Postgres exposto em `localhost:5432` (`financeiro` / `financeiro`) para você
   plugar qualquer ferramenta de BI.
 - Rodar os testes: `docker compose exec web python manage.py test`
@@ -92,7 +93,7 @@ abaixo). O **assistente de IA requer Postgres** — não funciona no modo SQLite
 ## 📥 Importar a planilha (opcional)
 
 ```bash
-python manage.py import_xlsx --create-user        # cria thiago/tj123 e importa
+python manage.py import_xlsx --create-user        # cria user/pass (troca obrigatória) e importa
 python manage.py seed_categories                  # cria categorias e classifica
 ```
 
@@ -132,7 +133,7 @@ retorna 404 — dificulta bots). Está protegido por:
   dígitos de um app autenticador (Google Authenticator/Authy). Para cadastrar/renovar
   o 2FA de um usuário e ver o QR Code:
   ```bash
-  docker compose exec web python manage.py setup_2fa --user thiago
+  docker compose exec web python manage.py setup_2fa --user user
   ```
 - **Rate-limit de login** (django-axes): trava após 5 tentativas erradas (por
   usuário), destrava sozinho em 30 min. Destravar manual: `python manage.py axes_reset`.
@@ -142,8 +143,9 @@ retorna 404 — dificulta bots). Está protegido por:
 Trocar senha dentro do `/chefao`: link "Alterar senha" no topo, ou em
 **Users → usuário → senha**.
 
-> ⚠️ A senha-semente `tj123` é fraca e serve só para começar. **Troque-a** antes de
-> expor o app na internet.
+> ⚠️ A conta-semente `user`/`pass` usa senha temporária e **exige a troca no
+> primeiro login**. Ainda assim, defina uma senha forte antes de expor o app na
+> internet.
 
 ### Sobre o `SECRET_KEY`
 

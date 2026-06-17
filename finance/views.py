@@ -8,14 +8,15 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from django.contrib import messages
-from django.contrib.auth import login
+from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import SetPasswordForm
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 
 from . import selectors
 from .forms import CardForm, CategoryForm, InstallmentForm, RegisterForm, TransactionForm
-from .models import Card, Category, Installment, Kind, Transaction
+from .models import Card, Category, Installment, Kind, Profile, Transaction
 from .services import generate_installments
 
 
@@ -72,6 +73,19 @@ def register(request):
         messages.success(request, "Conta criada! Bem-vindo ao seu planejamento.")
         return redirect("dashboard")
     return render(request, "registration/register.html", {"form": form})
+
+
+@login_required
+def force_password_change(request):
+    """Seed accounts (user/pass) must set a real password before anything else."""
+    form = SetPasswordForm(request.user, request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        form.save()
+        update_session_auth_hash(request, form.user)  # don't log the user out
+        Profile.objects.update_or_create(user=request.user, defaults={"must_change_password": False})
+        messages.success(request, "Senha definida! Bem-vindo.")
+        return redirect("dashboard")
+    return render(request, "registration/force_password_change.html", {"form": form})
 
 
 # --------------------------------------------------------------------------- #
