@@ -28,6 +28,7 @@ def _chat(messages, temperature=0.0) -> str:
         r = requests.post(
             f"{OLLAMA_URL}/api/chat",
             json={"model": OLLAMA_MODEL, "messages": messages, "stream": False,
+                  "keep_alive": -1,  # keep the model resident between questions
                   "options": {"temperature": temperature}},
             timeout=TIMEOUT,
         )

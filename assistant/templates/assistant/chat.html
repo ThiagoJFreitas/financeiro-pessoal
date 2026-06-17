@@ -4,15 +4,27 @@
 <h3 class="mb-1"><i class="bi bi-robot"></i> Assistente financeiro</h3>
 <p class="text-muted">Pergunte em português sobre suas contas. A IA roda <strong>localmente</strong> (Ollama) e só consulta os seus dados, em modo somente-leitura.</p>
 
-<form method="post" class="card card-body shadow-sm mb-3">{% csrf_token %}
+<form method="post" class="card card-body shadow-sm mb-3" id="askForm">{% csrf_token %}
   <div class="input-group">
-    <input type="text" name="question" class="form-control" placeholder="Ex.: quanto gastei com saúde em 2026?" value="{{ question|default:'' }}" autofocus>
-    <button class="btn btn-primary">Perguntar</button>
+    <input type="text" name="question" id="questionInput" class="form-control" placeholder="Ex.: quanto gastei com saúde em 2026?" value="{{ question|default:'' }}" autofocus autocomplete="off">
+    <button class="btn btn-primary" id="askBtn">Perguntar</button>
   </div>
   <div class="mt-2">
     {% for ex in examples %}
       <button type="submit" name="question" value="{{ ex }}" class="btn btn-sm btn-outline-secondary mb-1">{{ ex }}</button>
     {% endfor %}
+  </div>
+  <div id="loading" class="d-none mt-3">
+    <div class="d-flex align-items-center gap-3 p-3 rounded loading-box">
+      <div class="spinner-border text-primary" role="status" aria-hidden="true"></div>
+      <div>
+        <div class="fw-semibold text-primary fs-5">Pensando<span id="thinkDots"></span></div>
+        <div class="small text-muted">
+          Consultando seus dados e gerando a resposta — <span id="elapsed">0</span>s
+          <br>A primeira pergunta pode levar até ~1 min (a IA carrega na memória).
+        </div>
+      </div>
+    </div>
   </div>
 </form>
 
@@ -53,4 +65,38 @@
     </div>
   </div>
 {% endif %}
+
+<style>
+  .loading-box {
+    background: #eef4ff;
+    border: 1px solid #cfe0ff;
+    animation: pulseBox 1.6s ease-in-out infinite;
+  }
+  @keyframes pulseBox {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(13,110,253,.18); }
+    50%      { box-shadow: 0 0 0 .5rem rgba(13,110,253,0); }
+  }
+</style>
+<script>
+  // Immediate feedback: the POST is synchronous and can take a while on the
+  // first (cold-start) question. The browser keeps running this page's JS while
+  // it waits for the response, so a live counter + animated dots reassure the
+  // user that something is happening.
+  (function () {
+    const form = document.getElementById('askForm');
+    if (!form) return;
+    form.addEventListener('submit', function () {
+      document.getElementById('loading').classList.remove('d-none');
+      const btn = document.getElementById('askBtn');
+      btn.disabled = true;
+      btn.textContent = 'Pensando…';
+
+      const elapsed = document.getElementById('elapsed');
+      const dots = document.getElementById('thinkDots');
+      let seconds = 0, d = 0;
+      setInterval(function () { seconds += 1; if (elapsed) elapsed.textContent = seconds; }, 1000);
+      setInterval(function () { d = (d + 1) % 4; if (dots) dots.textContent = '.'.repeat(d); }, 400);
+    });
+  })();
+</script>
 {% endblock %}

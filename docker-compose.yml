@@ -36,6 +36,10 @@ services:
 
   ollama:
     image: ollama/ollama
+    environment:
+      # Mantém o modelo carregado na RAM (evita o cold start de ~4 min a cada
+      # pausa de 5 min). Use "30m" se preferir liberar memória quando ocioso.
+      OLLAMA_KEEP_ALIVE: "-1"
     volumes:
       - ollama_models:/root/.ollama
     ports:
