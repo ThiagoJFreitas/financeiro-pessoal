@@ -43,5 +43,20 @@ def _answer(question: str, owner_id: int) -> dict:
     except AssistantDBError as e:
         return {"error": f"Erro ao executar a consulta: {e}", "sql": sql}
 
-    summary = llm.summarize(question, columns, rows) if rows else "Nenhum resultado encontrado."
-    return {"sql": sql, "columns": columns, "rows": rows, "summary": summary}
+    if not rows:
+        summary = "Nenhum resultado encontrado para essa pergunta."
+    else:
+        # Natural-language answer; fall back to a plain rendering if the model
+        # that writes the summary is unavailable, so the user always sees text.
+        summary = llm.summarize(question, columns, rows) or _fallback_text(columns, rows)
+    return {"summary": summary}
+
+
+def _fallback_text(columns, rows) -> str:
+    """Readable text from raw rows when the LLM summary is unavailable."""
+    if len(columns) == 1 and len(rows) == 1:
+        return f"{columns[0]}: {rows[0][0]}"
+    lines = []
+    for row in rows[:20]:
+        lines.append(", ".join(f"{c}: {v}" for c, v in zip(columns, row)))
+    return "\n".join(lines)
