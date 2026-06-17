@@ -45,6 +45,56 @@ class SqlGuardTests(TestCase):
         with self.assertRaises(UnsafeSQL):
             validate("SET app.current_user_id = 1")
 
+    def test_rejects_destructive_and_admin_commands(self):
+        attacks = [
+            "DROP DATABASE financeiro",
+            "DROP TABLE finance_installment",
+            "TRUNCATE finance_installment",
+            "ALTER USER thiago WITH PASSWORD 'hacked'",
+            "ALTER ROLE assistant_ro SUPERUSER",
+            "CREATE ROLE hacker LOGIN PASSWORD 'x'",
+            "GRANT ALL ON finance_installment TO assistant_ro",
+            "UPDATE auth_user SET password='x'",
+        ]
+        for sql in attacks:
+            with self.assertRaises(UnsafeSQL, msg=sql):
+                validate(sql)
+
+    def test_rejects_set_config_isolation_bypass(self):
+        # Calling set_config inside a SELECT could change the per-user GUC and
+        # leak another user's rows — must be blocked.
+        with self.assertRaises(UnsafeSQL):
+            validate("SELECT set_config('app.current_user_id','999',false), * FROM analytics.v_installments")
+
+    def test_rejects_data_modifying_cte(self):
+        with self.assertRaises(UnsafeSQL):
+            validate("WITH x AS (DELETE FROM finance_installment RETURNING *) SELECT * FROM x")
+
+    def test_rejects_file_and_exfil_functions(self):
+        for sql in [
+            "SELECT pg_read_file('/etc/passwd')",
+            "SELECT * FROM dblink('host=evil', 'select 1') AS t(x int)",
+            "SELECT pg_sleep(10)",
+        ]:
+            with self.assertRaises(UnsafeSQL, msg=sql):
+                validate(sql)
+
+    def test_rejects_comments(self):
+        with self.assertRaises(UnsafeSQL):
+            validate("SELECT 1 FROM analytics.v_cards -- DROP TABLE x")
+
+    def test_allows_keyword_inside_string_literal(self):
+        # 'drop'/'delete' as DATA (inside quotes) must NOT be blocked.
+        sql = validate("SELECT SUM(amount) FROM analytics.v_installments "
+                       "WHERE description = 'pagamento do drop e delete'")
+        self.assertIn("analytics.v_installments", sql)
+
+    def test_allows_legit_functions(self):
+        # EXTRACT(... FROM CURRENT_DATE) and replace() are legitimate.
+        sql = validate("SELECT EXTRACT(year FROM CURRENT_DATE), "
+                       "replace(description,'a','b') FROM analytics.v_installments")
+        self.assertIn("analytics.v_installments", sql)
+
 
 def _pg():
     return connection.vendor == "postgresql"
