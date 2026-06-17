@@ -38,6 +38,38 @@ um usuário nunca aparecem para outro.
 
 ---
 
+## 📸 Telas
+
+> Capturas da conta de demonstração (`teste` / `teste`) — dados fictícios gerados por
+> `python manage.py seed_demo`.
+
+### Resumo do mês — extrato com botão "Paguei"
+![Resumo](docs/screenshots/02-resumo.png)
+
+### Lançamentos — filtros e seleção múltipla (pagar/excluir em massa)
+![Lançamentos](docs/screenshots/03-lancamentos.png)
+
+### Relatório "A Pagar" — por cartão ou categoria, com "quando acaba"
+![A Pagar](docs/screenshots/04-a-pagar.png)
+
+### Cartão — burn-down (saldo diminuindo mês a mês)
+![Cartão](docs/screenshots/06-cartao-burndown.png)
+
+### Detalhe do parcelamento — antecipar / quitar / excluir
+![Parcelamento](docs/screenshots/07-parcelamento.png)
+
+### Assistente de IA (text-to-SQL, local)
+![Assistente](docs/screenshots/09-assistente.png)
+
+<details>
+<summary>Mais telas (login, cartões, categorias)</summary>
+
+![Login](docs/screenshots/01-login.png)
+![Cartões](docs/screenshots/05-cartoes.png)
+![Categorias](docs/screenshots/08-categorias.png)
+
+</details>
+
 ## 🧱 Stack
 
 - **Backend**: Django 4.2 (LTS), Python 3.12
@@ -100,6 +132,10 @@ python manage.py seed_categories                  # cria categorias e classifica
 A importação é **best-effort**: os itens entram marcados como **"pendente de
 revisão"** para você conferir os valores (há diferenças por inconsistências da
 própria planilha). O caminho padrão do arquivo pode ser ajustado com `--file`.
+
+> Só quer **ver o app funcionando** com dados de exemplo? Rode
+> `python manage.py seed_demo` — cria a conta **`teste` / `teste`** com lançamentos,
+> cartões e parcelas fictícios (as telas acima).
 
 ---
 
