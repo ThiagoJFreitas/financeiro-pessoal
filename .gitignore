@@ -5,6 +5,7 @@ db.sqlite3
 .env
 staticfiles/
 .DS_Store
-.claude/settings.local.json
+# Configuração local do Claude Code — não versionar
+.claude/
 # Dados financeiros reais — não versionar (usado só p/ seed local do Docker)
 finance/fixtures/initial_data.json
