@@ -52,16 +52,28 @@
   </div>
 </form>
 
+<form id="bulkForm" method="post" action="{% url 'installments_bulk' %}">{% csrf_token %}
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <span class="text-muted small" id="selCount">Nenhum selecionado</span>
+    <button type="submit" name="action" value="pay" id="btnPay" class="btn btn-sm btn-success" disabled>
+      <i class="bi bi-check-lg"></i> Confirmar pagamento</button>
+    <button type="submit" name="action" value="delete" id="btnDelete" class="btn btn-sm btn-danger" disabled>
+      <i class="bi bi-trash"></i> Excluir selecionados</button>
+  </div>
+</form>
+
 <div class="card shadow-sm">
   <div class="table-responsive">
     <table class="table table-sm table-hover mb-0">
       <thead class="table-light">
-        <tr><th>Competência</th><th>Descrição</th><th>Categoria</th><th>Cartão</th>
+        <tr><th style="width:32px"><input type="checkbox" id="chkAll" class="form-check-input" title="Selecionar todos"></th>
+            <th>Competência</th><th>Descrição</th><th>Categoria</th><th>Cartão</th>
             <th class="text-end">Valor</th><th class="text-center">Status</th><th></th></tr>
       </thead>
       <tbody>
         {% for i in installments %}
         <tr class="{% if i.transaction.kind == 'INCOME' %}table-success{% endif %}">
+          <td><input type="checkbox" name="ids" value="{{ i.pk }}" form="bulkForm" class="form-check-input rowchk"></td>
           <td>{{ i.competence_month|date:'m/Y' }}</td>
           <td><a href="{% url 'transaction_detail' i.transaction.pk %}" class="text-decoration-none">{{ i.label }}</a>{% if i.transaction.needs_review %} <span class="badge bg-warning text-dark" title="Importado da planilha — revise">revisar</span>{% endif %}</td>
           <td>{% if i.transaction.category %}<span class="badge" style="background:{{ i.transaction.category.color }}">{{ i.transaction.category.name }}</span>{% else %}-{% endif %}</td>
@@ -86,14 +98,54 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-center text-muted py-4">Nenhum lançamento encontrado.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">Nenhum lançamento encontrado.</td></tr>
         {% endfor %}
       </tbody>
       <tfoot class="table-light">
-        <tr><th colspan="4">Total ({{ installments|length }} parcelas)</th><th class="text-end">{{ total|brl }}</th><th colspan="2"></th></tr>
+        <tr><th colspan="5">Total ({{ installments|length }} parcelas)</th><th class="text-end">{{ total|brl }}</th><th colspan="2"></th></tr>
       </tfoot>
     </table>
   </div>
 </div>
+
+<script>
+  (function () {
+    const chkAll = document.getElementById('chkAll');
+    const rows = Array.from(document.querySelectorAll('.rowchk'));
+    const btnPay = document.getElementById('btnPay');
+    const btnDelete = document.getElementById('btnDelete');
+    const label = document.getElementById('selCount');
+    const form = document.getElementById('bulkForm');
+    if (!form) return;
+
+    const selected = () => rows.filter(c => c.checked);
+
+    function refresh() {
+      const n = selected().length;
+      label.textContent = n === 0 ? 'Nenhum selecionado' : n + ' selecionado(s)';
+      btnPay.disabled = btnDelete.disabled = n === 0;
+      if (chkAll) chkAll.checked = n > 0 && n === rows.length;
+    }
+
+    if (chkAll) chkAll.addEventListener('change', () => {
+      rows.forEach(c => { c.checked = chkAll.checked; });
+      refresh();
+    });
+    rows.forEach(c => c.addEventListener('change', refresh));
+
+    // Ask for confirmation before running the bulk action.
+    form.addEventListener('submit', function (e) {
+      const n = selected().length;
+      if (n === 0) { e.preventDefault(); return; }
+      const action = e.submitter ? e.submitter.value : '';
+      const msg = action === 'delete'
+        ? 'Excluir ' + n + ' lançamento(s) selecionado(s)? Esta ação não pode ser desfeita.'
+        : 'Confirmar pagamento de ' + n + ' lançamento(s) selecionado(s)?';
+      if (!confirm(msg)) e.preventDefault();
+    });
+
+    refresh();
+  })();
+</script>
 
 {% endblock %}

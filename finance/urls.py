@@ -14,6 +14,7 @@ urlpatterns = [
     path("lancamentos/<int:pk>/excluir/", views.transaction_delete, name="transaction_delete"),
     path("lancamentos/<int:pk>/revisado/", views.transaction_toggle_review, name="transaction_toggle_review"),
     path("lancamentos/revisar-todos/", views.transactions_mark_all_reviewed, name="transactions_mark_all_reviewed"),
+    path("lancamentos/acao-em-massa/", views.installments_bulk, name="installments_bulk"),
 
     # Parcelas
     path("parcelas/<int:pk>/editar/", views.installment_edit, name="installment_edit"),

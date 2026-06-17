@@ -258,6 +258,32 @@ def installment_toggle_paid(request, pk):
     return redirect(_safe_next(request, request.META.get("HTTP_REFERER")))
 
 
+@login_required
+def installments_bulk(request):
+    """Bulk action over selected installments: confirm payment or delete.
+
+    Owner-scoped (a user can only act on their own rows). The confirmation
+    prompt happens in the browser before this is called.
+    """
+    if request.method == "POST":
+        ids = request.POST.getlist("ids")
+        action = request.POST.get("action")
+        qs = Installment.objects.filter(owner=request.user, pk__in=ids)
+
+        if action == "pay":
+            n = qs.update(paid=True, paid_date=date.today())
+            messages.success(request, f"{n} lançamento(s) marcados como pagos.")
+        elif action == "delete":
+            tx_ids = set(qs.values_list("transaction_id", flat=True))
+            n = qs.count()
+            qs.delete()
+            # Drop parent transactions that no longer have any installments.
+            Transaction.objects.filter(owner=request.user, pk__in=tx_ids, installments__isnull=True).delete()
+            messages.success(request, f"{n} lançamento(s) excluído(s).")
+
+    return redirect(_safe_next(request, request.META.get("HTTP_REFERER")))
+
+
 # --------------------------------------------------------------------------- #
 # Cards
 # --------------------------------------------------------------------------- #

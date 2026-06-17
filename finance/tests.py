@@ -76,6 +76,49 @@ class IsolationTests(TestCase):
         self.assertEqual(summary.expense, Decimal("100.00"))  # b's 999 not included
 
 
+class BulkActionTests(TestCase):
+    def setUp(self):
+        from django.test import Client
+        self.user = User.objects.create_user("bulk", password="x")
+        self.client = Client()
+        self.client.login(username="bulk", password="x")
+        self.tx = Transaction.objects.create(
+            owner=self.user, kind=Kind.EXPENSE, description="compra",
+            total_amount=Decimal("300.00"), repeat_type=RepeatType.INSTALLMENT,
+            repeat_count=3, first_competence=date(2026, 1, 1),
+        )
+        generate_installments(self.tx)
+        self.ids = list(self.tx.installments.values_list("pk", flat=True))
+
+    def test_bulk_pay(self):
+        self.client.post("/lancamentos/acao-em-massa/", {"action": "pay", "ids": self.ids[:2]})
+        self.assertEqual(Installment.objects.filter(pk__in=self.ids, paid=True).count(), 2)
+
+    def test_bulk_delete_removes_empty_transaction(self):
+        self.client.post("/lancamentos/acao-em-massa/", {"action": "delete", "ids": self.ids})
+        self.assertEqual(Installment.objects.filter(pk__in=self.ids).count(), 0)
+        # all parcelas gone -> the parent transaction is cleaned up too
+        self.assertFalse(Transaction.objects.filter(pk=self.tx.pk).exists())
+
+    def test_bulk_delete_keeps_transaction_with_remaining(self):
+        self.client.post("/lancamentos/acao-em-massa/", {"action": "delete", "ids": self.ids[:1]})
+        self.assertTrue(Transaction.objects.filter(pk=self.tx.pk).exists())
+        self.assertEqual(self.tx.installments.count(), 2)
+
+    def test_cannot_act_on_other_users_rows(self):
+        other = User.objects.create_user("intruder", password="x")
+        c = self.__class__.client_for(other)
+        c.post("/lancamentos/acao-em-massa/", {"action": "delete", "ids": self.ids})
+        self.assertEqual(Installment.objects.filter(pk__in=self.ids).count(), 3)  # untouched
+
+    @staticmethod
+    def client_for(user):
+        from django.test import Client
+        c = Client()
+        c.force_login(user)
+        return c
+
+
 class CommitmentTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user("c1", password="x")
