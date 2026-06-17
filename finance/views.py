@@ -94,7 +94,8 @@ def dashboard(request):
         "summary": summary,
         "cards": cards,
         "pending_review": Transaction.objects.filter(owner=owner, needs_review=True).count(),
-        "commitments": selectors.active_commitments(owner),
+        "statement": selectors.monthly_statement(owner, month),
+        "month_str": month.strftime("%Y-%m"),
         "bar_chart": selectors.income_expense_series(owner, recent),
         "pie_chart": selectors.expense_by_category(owner, month),
         "line_chart": selectors.leftover_series(owner, recent),
@@ -297,6 +298,20 @@ def card_delete(request, pk):
         messages.success(request, "Cartão excluído.")
         return redirect("card_list")
     return render(request, "finance/confirm_delete.html", {"object": card, "title": "Excluir cartão"})
+
+
+@login_required
+def card_pay_month(request, pk):
+    """'Paguei' for a whole card invoice in a month: toggle all its parcelas."""
+    card = get_object_or_404(Card, pk=pk, owner=request.user)
+    month = _parse_month(request.GET.get("month"))
+    if request.method == "POST" and month:
+        qs = Installment.objects.filter(owner=request.user, transaction__card=card, competence_month=month)
+        if qs.filter(paid=False).exists():
+            qs.update(paid=True, paid_date=date.today())   # pay the remainder
+        else:
+            qs.update(paid=False, paid_date=None)            # undo
+    return redirect(_safe_next(request, request.META.get("HTTP_REFERER"), fallback="dashboard"))
 
 
 @login_required

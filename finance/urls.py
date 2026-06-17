@@ -23,6 +23,7 @@ urlpatterns = [
     path("cartoes/", views.card_list, name="card_list"),
     path("cartoes/novo/", views.card_create, name="card_create"),
     path("cartoes/<int:pk>/", views.card_detail, name="card_detail"),
+    path("cartoes/<int:pk>/pagar-mes/", views.card_pay_month, name="card_pay_month"),
     path("cartoes/<int:pk>/editar/", views.card_edit, name="card_edit"),
     path("cartoes/<int:pk>/excluir/", views.card_delete, name="card_delete"),
 

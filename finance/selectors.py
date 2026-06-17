@@ -151,6 +151,56 @@ def to_pay_grouped(owner, by: str = "card", month=None, card_id=None, category_i
     return [{"name": r[key] or fallback, "total": r["total"], "ends": r["ends"], "qtd": r["qtd"]} for r in rows]
 
 
+def monthly_statement(owner, month: date) -> dict:
+    """The month as a statement, like the spreadsheet column: one line per card
+    (its invoice total) and one line per non-card bill, plus income lines and
+    totals. Each line carries its paid state so the UI can show a 'Paguei' toggle.
+    """
+    insts = (
+        Installment.objects.filter(owner=owner, competence_month=month)
+        .select_related("transaction", "transaction__card", "transaction__category")
+    )
+    cards: dict = {}
+    bills, incomes = [], []
+    total_expense = expense_paid = Decimal("0")
+    total_income = income_received = Decimal("0")
+
+    for i in insts:
+        tx = i.transaction
+        if tx.kind == Kind.INCOME:
+            incomes.append(i)
+            total_income += i.amount
+            if i.paid:
+                income_received += i.amount
+        elif tx.card_id:
+            c = cards.setdefault(tx.card_id, {"card": tx.card, "total": Decimal("0"), "paid_all": True})
+            c["total"] += i.amount
+            if not i.paid:
+                c["paid_all"] = False
+            total_expense += i.amount
+            if i.paid:
+                expense_paid += i.amount
+        else:  # non-card bill (aluguel, plano de saúde, etc.)
+            bills.append(i)
+            total_expense += i.amount
+            if i.paid:
+                expense_paid += i.amount
+
+    card_lines = sorted(cards.values(), key=lambda r: r["total"], reverse=True)
+    bills.sort(key=lambda i: i.amount, reverse=True)
+    incomes.sort(key=lambda i: i.amount, reverse=True)
+    return {
+        "card_lines": card_lines,
+        "bills": bills,
+        "incomes": incomes,
+        "total_expense": total_expense,
+        "expense_unpaid": total_expense - expense_paid,
+        "total_income": total_income,
+        "income_pending": total_income - income_received,
+        "leftover": total_income - total_expense,
+    }
+
+
 def active_commitments(owner) -> list[dict]:
     """Multi-installment commitments (parcelados/recorrentes) not yet settled.
 
